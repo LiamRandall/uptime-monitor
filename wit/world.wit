@@ -9,14 +9,25 @@ interface cron {
     prune: func();
 }
 
-/// The HTTP component: serves the REST API + dashboard, and exports the cron
-/// interface so the service can trigger periodic polling.
+/// The HTTP component with cron support: serves the REST API + dashboard,
+/// and exports the cron interface so the service can trigger periodic polling.
+/// Used with `wash dev` locally alongside the cron-service.
 world uptime-monitor {
     import wasi:http/outgoing-handler@0.2.2;
     import wasi:keyvalue/store@0.2.0-draft;
 
     export wasi:http/incoming-handler@0.2.2;
     export cron;
+}
+
+/// Standalone HTTP component without the cron export. Use this for deploying
+/// to Cosmonic Control where the cron service is not available — polling is
+/// done on-demand via POST /api/poll.
+world uptime-monitor-standalone {
+    import wasi:http/outgoing-handler@0.2.2;
+    import wasi:keyvalue/store@0.2.0-draft;
+
+    export wasi:http/incoming-handler@0.2.2;
 }
 
 /// The cron service: a long-running process that calls poll-all every 1s

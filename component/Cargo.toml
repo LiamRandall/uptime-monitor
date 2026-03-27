@@ -8,6 +8,10 @@ authors = ["Liam <liam@cosmonic.com>"]
 [lib]
 crate-type = ["cdylib"]
 
+[features]
+default = ["cron"]
+cron = []
+
 [dependencies]
 http = "1.2"
 serde = { version = "1", features = ["derive"] }

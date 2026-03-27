@@ -38,6 +38,7 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
+#[cfg(feature = "cron")]
 mod bindings {
     wit_bindgen::generate!({
         world: "uptime-monitor",
@@ -46,6 +47,16 @@ mod bindings {
     });
 }
 
+#[cfg(not(feature = "cron"))]
+mod bindings {
+    wit_bindgen::generate!({
+        world: "uptime-monitor-standalone",
+        path: "../wit",
+        generate_all,
+    });
+}
+
+#[cfg(feature = "cron")]
 use bindings::exports::cosmonic::uptime_monitor::cron::Guest as CronGuest;
 use bindings::exports::wasi::http::incoming_handler::Guest;
 use bindings::wasi::http::outgoing_handler;
@@ -1256,6 +1267,7 @@ impl Guest for UptimeMonitor {
 // Cron interface (called by the companion service component)
 // ---------------------------------------------------------------------------
 
+#[cfg(feature = "cron")]
 impl CronGuest for UptimeMonitor {
     fn poll_all() {
         let devices = load_devices();
