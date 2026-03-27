@@ -1,0 +1,9 @@
+[package]
+name = "uptime-monitor-service"
+version = "0.1.0"
+edition = "2021"
+description = "Cron service — polls devices every 1s and prunes old history every 60s"
+authors = ["Liam <liam@cosmonic.com>"]
+
+[dependencies]
+wit-bindgen = "0.41"

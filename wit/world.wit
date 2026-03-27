@@ -1,0 +1,27 @@
+package cosmonic:uptime-monitor;
+
+/// Interface for cron-driven operations. The service component imports this
+/// and calls it on a timer; the HTTP component exports the implementation.
+interface cron {
+    /// Poll all registered devices and record results.
+    poll-all: func();
+    /// Prune check history older than 24 hours.
+    prune: func();
+}
+
+/// The HTTP component: serves the REST API + dashboard, and exports the cron
+/// interface so the service can trigger periodic polling.
+world uptime-monitor {
+    import wasi:http/outgoing-handler@0.2.2;
+    import wasi:keyvalue/store@0.2.0-draft;
+
+    export wasi:http/incoming-handler@0.2.2;
+    export cron;
+}
+
+/// The cron service: a long-running process that calls poll-all every 1s
+/// and prune every 60s. The wasi:cli/run export is provided automatically
+/// by the Rust wasip2 runtime via fn main().
+world cron-service {
+    import cron;
+}

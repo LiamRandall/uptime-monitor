@@ -1,0 +1,15 @@
+build:
+  command: cargo build --workspace --target wasm32-wasip2 --release
+  component_path: target/wasm32-wasip2/release/uptime_monitor.wasm
+
+dev:
+  address: 0.0.0.0:8080
+  service_file: target/wasm32-wasip2/release/uptime-monitor-service.wasm
+
+  # Backend: in_memory (default)
+  # No configuration needed. Data is lost when the process exits.
+
+  # Backend: redis
+  # Uncomment the line below to use Redis as the keyvalue store.
+  # Requires a running Redis server.
+  # wasi_keyvalue_redis_url: redis://127.0.0.1:6379

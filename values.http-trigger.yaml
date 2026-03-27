@@ -1,0 +1,18 @@
+components:
+  - name: uptime-monitor
+    image: ghcr.io/liam/uptime-monitor:0.1.0
+
+ingress:
+  host: "uptime-monitor.localhost.cosmonic.sh"
+
+hostInterfaces:
+  - namespace: wasi
+    package: keyvalue
+    version: 0.2.0-draft
+    interfaces:
+      - store
+  - namespace: wasi
+    package: http
+    version: 0.2.2
+    interfaces:
+      - outgoing-handler
