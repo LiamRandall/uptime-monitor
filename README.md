@@ -7,48 +7,61 @@ checks and serves metrics through a REST API and a live HTML dashboard.
 ## Architecture
 
 ```
-┌─────────────────────────────────────────────┐
-│              wasmCloud Host                  │
-│                                             │
-│  ┌─────────────┐    ┌──────────────────┐    │
-│  │ HTTP Server ├───►│ uptime-monitor   │    │
-│  │  :8080      │    │  (wasm component)│    │
-│  └─────────────┘    └──┬──────────┬────┘    │
-│                        │          │         │
-│               ┌────────▼──┐  ┌───▼───────┐  │
-│               │HTTP Client│  │ Redis KV  │  │
-│               └─────┬─────┘  └─────┬─────┘  │
-│                     │              │         │
-└─────────────────────┼──────────────┼─────────┘
-                      │              │
-              ┌───────▼───────┐  ┌──▼──┐
-              │ Your Devices  │  │Redis│
-              │ (router, NAS, │  │     │
-              │  Pi, printer) │  └─────┘
-              └───────────────┘
+┌──────────────────────────────────────────────────┐
+│                  wasmCloud Host                  │
+│                                                  │
+│  ┌─────────────┐    ┌──────────────────┐         │
+│  │ HTTP Server ├───►│ uptime-monitor   │         │
+│  │  :8080      │    │  (HTTP component)│         │
+│  └─────────────┘    └──┬──────────┬────┘         │
+│                        │          │    ▲          │
+│               ┌────────▼──┐  ┌───▼────┴───────┐  │
+│               │HTTP Client│  │   KV Store     │  │
+│               └─────┬─────┘  └───▲────────────┘  │
+│                     │            │               │
+│               ┌─────┴────────────┴────┐          │
+│               │  uptime-monitor-service│          │
+│               │  (cron service)        │          │
+│               │  polls every 1s        │          │
+│               │  prunes every 60s      │          │
+│               └────────────────────────┘          │
+└─────────────────┼────────────────────────────────┘
+                  │
+          ┌───────▼───────┐
+          │ Your Devices  │
+          │ (router, NAS, │
+          │  Pi, printer) │
+          └───────────────┘
 ```
+
+The project is a Rust workspace with two crates:
+
+- **`component/`** — HTTP component exporting `wasi:http/incoming-handler` (REST API + dashboard) and a `cron` interface
+- **`service/`** — Long-running service that imports the `cron` interface, polling all devices every 1 second and pruning old history every 60 seconds
 
 ## Prerequisites
 
-- [wash](https://wasmcloud.com/docs/installation) v0.36+
+- [wash](https://wasmcloud.com/docs/installation) v2.0+
 - Rust with `wasm32-wasip2` target: `rustup target add wasm32-wasip2`
-- Redis running locally (for KV persistence): `redis-server`
 
 ## Quick Start
 
 ```bash
-# 1. Build the component
+# 1. Build both components
 wash build
 
 # 2. Start wasmCloud + deploy (development mode)
 wash dev
-
-# 3. Or deploy with the full manifest
-wash up -d                          # start wasmCloud host in background
-wash app deploy wadm.yaml           # deploy the application
 ```
 
 The API is now live at **http://localhost:8080**.
+
+## Configuration
+
+Edit `.wash/config.yaml` to change:
+
+- **Listen address** — `dev.address` (default `0.0.0.0:8080`)
+- **KV backend** — uncomment `wasi_keyvalue_redis_url` for Redis, or use the default in-memory store
 
 ## API Reference
 
@@ -115,6 +128,8 @@ Open in your browser:
 http://localhost:8080/api/dashboard
 ```
 
+Click any device name to see its detailed status page with 24-hour history.
+
 ## Example: Monitoring a Home Network
 
 ```bash
@@ -130,26 +145,26 @@ curl -X POST localhost:8080/api/devices -H 'Content-Type: application/json' \
 curl -X POST localhost:8080/api/devices -H 'Content-Type: application/json' \
   -d '{"id":"nas","name":"Synology NAS","url":"http://192.168.1.100:5000/"}'
 
-# Add a printer
-curl -X POST localhost:8080/api/devices -H 'Content-Type: application/json' \
-  -d '{"id":"printer","name":"Office Printer","url":"http://192.168.1.200/"}'
-
-# Poll everything
-curl -X POST localhost:8080/api/poll
-
 # Check the dashboard
 open http://localhost:8080/api/dashboard
 ```
 
-## Automated Polling
+The cron service will automatically start polling all devices every second.
 
-The component responds to on-demand poll requests. To set up periodic polling,
-use a cron job or a systemd timer on the host machine:
+## Publishing
 
 ```bash
-# crontab -e
-# Poll every 5 minutes
-*/5 * * * * curl -s -X POST http://localhost:8080/api/poll > /dev/null
+# Build and push both components to an OCI registry
+./update-oci.sh 0.1.0
+```
+
+## Deploying to Cosmonic Control
+
+```bash
+helm install uptime-monitor \
+  -n uptime-monitor --create-namespace \
+  -f values.http-trigger.yaml \
+  path/to/charts/http-trigger
 ```
 
 ## Metrics Response Shape
@@ -169,13 +184,6 @@ use a cron job or a systemd timer on the host machine:
   "consecutive_failures": 0
 }
 ```
-
-## Configuration
-
-Edit `wadm.yaml` to change:
-
-- **Listen port** — `source_config.address` on the httpserver link (default `0.0.0.0:8080`)
-- **Redis URL** — `target_config.url` on the kvredis link (default `redis://127.0.0.1:6379`)
 
 ## License
 
